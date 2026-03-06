@@ -1,12 +1,16 @@
 import { AxiosError } from "axios";
-import { Injectable } from "injection-js";
+import { Inject, Injectable } from "injection-js";
+import { LocalAuthStorage } from "../../domain/auth/repositories/localAuthStorage";
+import { TokenStorageToken } from "../../infrastructure/storage/TokenStorage";
 
 @Injectable()
 export class InterceptorHandler {
-  constructor() {}
+  constructor(
+    @Inject(TokenStorageToken) private localAuthStorage: LocalAuthStorage,
+  ) {}
 
-  getToken(): string {
-    return "mock-token-123456";
+  getToken(): string | null {
+    return this.localAuthStorage.getToken();
   }
   onErrorCallback(err: AxiosError): void {
     console.log("handle API Error:", err.message);

@@ -5,7 +5,7 @@
       <div class="user-info">
         <span>欢迎, {{ authStore.user?.username }}</span>
         <button @click="handleLogout" :disabled="authStore.loading">
-          {{ authStore.loading ? '退出中...' : '退出登录' }}
+          {{ authStore.loading ? "退出中..." : "退出登录" }}
         </button>
       </div>
     </header>
@@ -19,22 +19,23 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/authStore'
-import { di } from '../../config/di'
-import { HttpClient } from '../../infrastructure/http/httpClient'
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/authStore";
+import { di } from "../../config/di";
+import { HttpClient } from "../../infrastructure/http/httpClient";
 
-const authStore = useAuthStore()
-const router = useRouter()
+const authStore = useAuthStore();
+const router = useRouter();
 
 async function handleLogout() {
- const httpClient = di.get<HttpClient>(HttpClient)
- httpClient.post('/api/logout') // 发送登出请求到后端
-   .catch(() => {
-     // 即使请求失败，也继续执行登出流程
-   })
-  await authStore.logout()
-  router.push('/login')
+  const httpClient = di.get<HttpClient>(HttpClient);
+  const [err, _] = await httpClient
+    .post("/api/logout")
+    .tryCatch({ errorToast: true, loading: true }); // 发送登出请求到后端
+  if (err) return;
+
+  await authStore.logout();
+  router.push("/login");
 }
 </script>
 

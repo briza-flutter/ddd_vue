@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import './common/utils/promise_to'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
