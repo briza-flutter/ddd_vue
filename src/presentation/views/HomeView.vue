@@ -21,11 +21,18 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
+import { di } from '../../config/di'
+import { HttpClient } from '../../infrastructure/http/httpClient'
 
 const authStore = useAuthStore()
 const router = useRouter()
 
 async function handleLogout() {
+ const httpClient = di.get<HttpClient>(HttpClient)
+ httpClient.post('/api/logout') // 发送登出请求到后端
+   .catch(() => {
+     // 即使请求失败，也继续执行登出流程
+   })
   await authStore.logout()
   router.push('/login')
 }

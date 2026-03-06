@@ -67,15 +67,15 @@ function parseInjectableClass(filePath) {
   }
 }
 
-function parseTokens() {
-  if (!fs.existsSync(tokensFilePath)) return []
+function parseTokensFromFile(filePath) {
+  if (!fs.existsSync(filePath)) return []
 
-  const content = fs.readFileSync(tokensFilePath, 'utf-8')
+  const content = fs.readFileSync(filePath, 'utf-8')
   const tokens = []
   const re = /export\s+const\s+(\w+)\s*=\s*new\s+InjectionToken\s*<\s*(\w+)\s*>/g
   let m
   while ((m = re.exec(content)) !== null) {
-    tokens.push({ tokenName: m[1], interfaceName: m[2] })
+    tokens.push({ tokenName: m[1], interfaceName: m[2], filePath })
   }
   return tokens
 }
@@ -91,24 +91,28 @@ function relImport(from, to) {
 
 // ── 主逻辑 ──────────────────────────────────────────────
 
-const tokens = parseTokens()
-const ifaceToToken = new Map(tokens.map((t) => [t.interfaceName, t.tokenName]))
+// 从 tokens.ts 和扫描目录中收集所有 InjectionToken
+const allScannedFiles = scanDirs.flatMap((dir) => findTsFiles(path.join(srcDir, dir)))
+const tokens = [
+  ...parseTokensFromFile(tokensFilePath),
+  ...allScannedFiles.flatMap(parseTokensFromFile),
+]
+const ifaceToToken = new Map(tokens.map((t) => [t.interfaceName, t]))
 
 // 扫描所有配置目录
-const allClasses = scanDirs.flatMap((dir) => {
-  const fullDir = path.join(srcDir, dir)
-  return findTsFiles(fullDir).map(parseInjectableClass).filter(Boolean)
-})
+const allClasses = allScannedFiles.map(parseInjectableClass).filter(Boolean)
 
 const tokenBindings = []
 const standaloneClasses = []
 
 for (const cls of allClasses) {
   if (cls.implementsInterface && ifaceToToken.has(cls.implementsInterface)) {
+    const token = ifaceToToken.get(cls.implementsInterface)
     tokenBindings.push({
-      tokenName: ifaceToToken.get(cls.implementsInterface),
+      tokenName: token.tokenName,
+      tokenFilePath: token.filePath,
       className: cls.className,
-      filePath: cls.filePath,
+      classFilePath: cls.filePath,
     })
   } else {
     standaloneClasses.push(cls)
@@ -122,17 +126,23 @@ const imports = [
   "import { setInjector, customProviders } from './index'",
 ]
 
-if (tokenBindings.length > 0) {
-  const names = tokenBindings.map((b) => b.tokenName).join(', ')
-  imports.push(`import { ${names} } from './tokens'`)
+// 按文件分组收集需要导入的符号
+const importMap = new Map()
+function addImport(filePath, name) {
+  if (!importMap.has(filePath)) importMap.set(filePath, new Set())
+  importMap.get(filePath).add(name)
 }
 
 for (const b of tokenBindings) {
-  imports.push(`import { ${b.className} } from '${relImport(registerFilePath, b.filePath)}'`)
+  addImport(b.tokenFilePath, b.tokenName)
+  addImport(b.classFilePath, b.className)
+}
+for (const cls of standaloneClasses) {
+  addImport(cls.filePath, cls.className)
 }
 
-for (const cls of standaloneClasses) {
-  imports.push(`import { ${cls.className} } from '${relImport(registerFilePath, cls.filePath)}'`)
+for (const [filePath, names] of importMap) {
+  imports.push(`import { ${[...names].join(', ')} } from '${relImport(registerFilePath, filePath)}'`)
 }
 
 const providers = []

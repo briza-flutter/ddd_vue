@@ -1,28 +1,33 @@
-const TOKEN_KEY = 'auth_token'
-const USER_KEY = 'auth_user'
+import { Injectable, InjectionToken } from "../../config/di";
+import { User } from "../../domain/auth/entities/User";
+import { LocalAuthStorage } from "../../domain/auth/repositories/localAuthStorage";
 
-export class TokenStorage {
-  static getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY)
+const TOKEN_KEY = "auth_token";
+const USER_KEY = "auth_user";
+export const TokenStorageToken = new InjectionToken<LocalAuthStorage>(
+  "TokenStorage",
+);
+
+@Injectable()
+export class TokenStorage implements LocalAuthStorage {
+  getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
   }
-
-  static setToken(token: string): void {
-    localStorage.setItem(TOKEN_KEY, token)
+  setToken(token: string): void {
+    localStorage.setItem(TOKEN_KEY, token);
   }
-
-  static clearToken(): void {
-    localStorage.removeItem(TOKEN_KEY)
+  clearToken(): void {
+    localStorage.removeItem(TOKEN_KEY);
   }
-
-  static getUser(): string | null {
+  getUser(): User | null {
     return localStorage.getItem(USER_KEY)
+      ? JSON.parse(localStorage.getItem(USER_KEY)!)
+      : null;
   }
-
-  static setUser(user: string): void {
-    localStorage.setItem(USER_KEY, user)
+  setUser(user: User): void {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
   }
-
-  static clearUser(): void {
-    localStorage.removeItem(USER_KEY)
+  clearUser(): void {
+    localStorage.removeItem(USER_KEY);
   }
 }
