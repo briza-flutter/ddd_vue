@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 // DI 自动注册代码生成器
 //
-// 扫描规则：
-//   1. src/application/ 下带 @Injectable() 的类 → 直接注册
-//   2. src/infrastructure/ 下带 @Injectable() 且 implements 某接口的类
-//      → 根据 tokens.ts 中的 InjectionToken<Interface> 自动匹配 token 绑定
-//   3. tokens.ts 中所有 InjectionToken 定义会被自动读取
-//
+// 通过 scanDirs 配置扫描目录，类似 Spring Boot 的 @ComponentScan
 // 用法：npm run generate:di
 
 import fs from 'fs'
@@ -17,8 +12,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const srcDir = path.resolve(__dirname, '../src')
 const registerFilePath = path.join(srcDir, 'config/di/register.ts')
 const tokensFilePath = path.join(srcDir, 'config/di/tokens.ts')
+const scanConfigPath = path.join(srcDir, 'config/di/scan.ts')
 
-/** 递归查找所有 .ts 文件 */
+// ── 读取扫描目录配置 ────────────────────────────────────
+// 从 src/config/di/scan.ts 中解析 scanDirs 数组
+
+function parseScanDirs() {
+  const content = fs.readFileSync(scanConfigPath, 'utf-8')
+  const match = content.match(/export\s+const\s+scanDirs\s*=\s*\[([\s\S]*?)\]/)
+  if (!match) {
+    console.error('❌ 无法解析 src/config/di/scan.ts 中的 scanDirs')
+    process.exit(1)
+  }
+  const items = []
+  const re = /['"]([^'"]+)['"]/g
+  let m
+  while ((m = re.exec(match[1])) !== null) {
+    items.push(m[1])
+  }
+  return items
+}
+
+const scanDirs = parseScanDirs()
+
+// ── 工具函数 ────────────────────────────────────────────
+
 function findTsFiles(dir) {
   const results = []
   if (!fs.existsSync(dir)) return results
@@ -33,7 +51,6 @@ function findTsFiles(dir) {
   return results.sort()
 }
 
-/** 解析文件中的 @Injectable() 类信息 */
 function parseInjectableClass(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8')
   if (!/@Injectable\(\)/.test(content)) return null
@@ -50,7 +67,6 @@ function parseInjectableClass(filePath) {
   }
 }
 
-/** 解析 tokens.ts，提取 token 名称与对应接口的映射 */
 function parseTokens() {
   if (!fs.existsSync(tokensFilePath)) return []
 
@@ -64,12 +80,11 @@ function parseTokens() {
   return tokens
 }
 
-/** 计算相对导入路径 */
 function relImport(from, to) {
   let rel = path
     .relative(path.dirname(from), to)
     .replace(/\.ts$/, '')
-    .replace(/\\/g, '/') // Windows 兼容
+    .replace(/\\/g, '/')
   if (!rel.startsWith('.')) rel = './' + rel
   return rel
 }
@@ -79,28 +94,24 @@ function relImport(from, to) {
 const tokens = parseTokens()
 const ifaceToToken = new Map(tokens.map((t) => [t.interfaceName, t.tokenName]))
 
-// 扫描 application 层（UseCase）
-const useCases = findTsFiles(path.join(srcDir, 'application'))
-  .map(parseInjectableClass)
-  .filter(Boolean)
+// 扫描所有配置目录
+const allClasses = scanDirs.flatMap((dir) => {
+  const fullDir = path.join(srcDir, dir)
+  return findTsFiles(fullDir).map(parseInjectableClass).filter(Boolean)
+})
 
-// 扫描 infrastructure 层（Repository 实现等）
-const allImpls = findTsFiles(path.join(srcDir, 'infrastructure'))
-  .map(parseInjectableClass)
-  .filter(Boolean)
+const tokenBindings = []
+const standaloneClasses = []
 
-const tokenBindings = [] // { tokenName, className, filePath }
-const standaloneImpls = [] // 没有匹配 token 的 @Injectable 类
-
-for (const impl of allImpls) {
-  if (impl.implementsInterface && ifaceToToken.has(impl.implementsInterface)) {
+for (const cls of allClasses) {
+  if (cls.implementsInterface && ifaceToToken.has(cls.implementsInterface)) {
     tokenBindings.push({
-      tokenName: ifaceToToken.get(impl.implementsInterface),
-      className: impl.className,
-      filePath: impl.filePath,
+      tokenName: ifaceToToken.get(cls.implementsInterface),
+      className: cls.className,
+      filePath: cls.filePath,
     })
   } else {
-    standaloneImpls.push(impl)
+    standaloneClasses.push(cls)
   }
 }
 
@@ -108,40 +119,28 @@ for (const impl of allImpls) {
 
 const imports = [
   "import { ReflectiveInjector } from 'injection-js'",
-  "import { setInjector } from './index'",
+  "import { setInjector, customProviders } from './index'",
 ]
 
-// token imports
 if (tokenBindings.length > 0) {
   const names = tokenBindings.map((b) => b.tokenName).join(', ')
   imports.push(`import { ${names} } from './tokens'`)
 }
 
-// infrastructure imports（token 绑定）
 for (const b of tokenBindings) {
   imports.push(`import { ${b.className} } from '${relImport(registerFilePath, b.filePath)}'`)
 }
 
-// infrastructure imports（独立注册）
-for (const impl of standaloneImpls) {
-  imports.push(`import { ${impl.className} } from '${relImport(registerFilePath, impl.filePath)}'`)
+for (const cls of standaloneClasses) {
+  imports.push(`import { ${cls.className} } from '${relImport(registerFilePath, cls.filePath)}'`)
 }
 
-// application imports
-for (const uc of useCases) {
-  imports.push(`import { ${uc.className} } from '${relImport(registerFilePath, uc.filePath)}'`)
-}
-
-// providers
 const providers = []
 for (const b of tokenBindings) {
   providers.push(`    { provide: ${b.tokenName}, useClass: ${b.className} },`)
 }
-for (const impl of standaloneImpls) {
-  providers.push(`    ${impl.className},`)
-}
-for (const uc of useCases) {
-  providers.push(`    ${uc.className},`)
+for (const cls of standaloneClasses) {
+  providers.push(`    ${cls.className},`)
 }
 
 const output = `// AUTO-GENERATED — do not edit manually
@@ -151,6 +150,7 @@ ${imports.join('\n')}
 export function registerDependencies(): void {
   const i = ReflectiveInjector.resolveAndCreate([
 ${providers.join('\n')}
+    ...customProviders,
   ])
 
   setInjector(i)
@@ -159,18 +159,14 @@ ${providers.join('\n')}
 
 fs.writeFileSync(registerFilePath, output)
 
-console.log('✅ register.ts generated')
+// ── 输出结果 ────────────────────────────────────────────
+
+console.log(`✅ register.ts generated (scan: ${scanDirs.join(', ')})`)
 console.log(`   Token bindings : ${tokenBindings.length}`)
 for (const b of tokenBindings) {
   console.log(`     ${b.tokenName} → ${b.className}`)
 }
-console.log(`   Use cases      : ${useCases.length}`)
-for (const uc of useCases) {
-  console.log(`     ${uc.className}`)
-}
-if (standaloneImpls.length > 0) {
-  console.log(`   Standalone     : ${standaloneImpls.length}`)
-  for (const impl of standaloneImpls) {
-    console.log(`     ${impl.className}`)
-  }
+console.log(`   Standalone     : ${standaloneClasses.length}`)
+for (const cls of standaloneClasses) {
+  console.log(`     ${cls.className}`)
 }

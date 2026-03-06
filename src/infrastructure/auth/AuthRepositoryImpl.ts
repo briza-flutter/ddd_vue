@@ -1,9 +1,9 @@
-import { Injectable } from 'injection-js'
 import type { User } from '../../domain/auth/entities/User'
 import { Credentials } from '../../domain/auth/value-objects/Credentials'
 import type { AuthRepository } from '../../domain/auth/repositories/AuthRepository'
 // import { httpClient } from '../http/httpClient'
 import { TokenStorage } from '../storage/TokenStorage'
+import { Injectable } from '../../config/di'
 
 @Injectable()
 export class AuthRepositoryImpl implements AuthRepository {
