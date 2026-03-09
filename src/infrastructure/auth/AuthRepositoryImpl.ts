@@ -4,8 +4,9 @@ import { Credentials } from "../../domain/auth/value-objects/Credentials";
 import { Inject, Injectable } from "../../config/di";
 import { LocalAuthStorage } from "../../domain/auth/repositories/localAuthStorage";
 import { HttpClient } from "../http/httpClient";
+import { AUTH_REPOSITORY } from "../../config/di/tokens";
 
-@Injectable()
+@Injectable({ as: AUTH_REPOSITORY })
 export class AuthRepositoryImpl implements AuthRepository {
   constructor(
     @Inject(HttpClient) private readonly httpClient: HttpClient,

@@ -7,6 +7,7 @@ import {
 
 // 扩展 Injectable 装饰器，支持 @Injectable({ as: AbstractClass }) 声明 DI token
 // 生成器会解析 as 参数，自动生成 { provide: as, useClass: Class } 绑定
+// as 参数可以是抽象类或 InjectionToken，提供更灵活的依赖注入配置
 type ProvideToken =
   | (abstract new (...args: any[]) => any)
   | InjectionToken<any>;
