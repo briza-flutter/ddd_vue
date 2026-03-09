@@ -4,13 +4,12 @@ import { Credentials } from "../../domain/auth/value-objects/Credentials";
 import { Inject, Injectable } from "../../config/di";
 import { LocalAuthStorage } from "../../domain/auth/repositories/localAuthStorage";
 import { HttpClient } from "../http/httpClient";
-import { TokenStorageToken } from "../storage/TokenStorage";
 
 @Injectable()
 export class AuthRepositoryImpl implements AuthRepository {
   constructor(
     @Inject(HttpClient) private readonly httpClient: HttpClient,
-    @Inject(TokenStorageToken)
+    @Inject(LocalAuthStorage)
     private readonly localAuthStorage: LocalAuthStorage,
   ) {}
   async login(credentials: Credentials): Promise<User> {

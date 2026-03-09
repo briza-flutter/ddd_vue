@@ -53,18 +53,38 @@ function findTsFiles(dir) {
 
 function parseInjectableClass(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8')
-  if (!/@Injectable\(\)/.test(content)) return null
+  if (!/@Injectable\(/.test(content)) return null
 
   const classMatch = content.match(
     /export\s+class\s+(\w+)(?:\s+implements\s+(\w+))?/,
   )
   if (!classMatch) return null
 
+  // 解析 @Injectable({ as: X }) 语法
+  const asMatch = content.match(/@Injectable\(\{[^}]*as:\s*(\w+)[^}]*\}\)/)
+
   return {
     filePath,
     className: classMatch[1],
     implementsInterface: classMatch[2] || null,
+    asToken: asMatch ? { name: asMatch[1], content } : null,
   }
+}
+
+// 从源文件中查找符号的 import 路径
+function findImportPath(content, symbolName) {
+  const re = new RegExp(`import\\s+(?:type\\s+)?\\{[^}]*\\b${symbolName}\\b[^}]*\\}\\s*from\\s*['"]([^'"]+)['"]`)
+  const m = content.match(re)
+  return m ? m[1] : null
+}
+
+// 将相对 import 路径解析为绝对文件路径
+function resolveImport(sourceFilePath, importSpecifier) {
+  if (!importSpecifier.startsWith('.')) return null
+  const resolved = path.resolve(path.dirname(sourceFilePath), importSpecifier)
+  if (fs.existsSync(resolved + '.ts')) return resolved + '.ts'
+  if (fs.existsSync(path.join(resolved, 'index.ts'))) return path.join(resolved, 'index.ts')
+  return resolved + '.ts'
 }
 
 function parseTokensFromFile(filePath) {
@@ -106,7 +126,24 @@ const tokenBindings = []
 const standaloneClasses = []
 
 for (const cls of allClasses) {
-  if (cls.implementsInterface && ifaceToToken.has(cls.implementsInterface)) {
+  if (cls.asToken) {
+    // 新模式: @Injectable({ as: X }) — 直接用 X 作为 provide token
+    const importSpec = findImportPath(cls.asToken.content, cls.asToken.name)
+    if (importSpec) {
+      const resolvedPath = resolveImport(cls.filePath, importSpec)
+      if (resolvedPath) {
+        tokenBindings.push({
+          tokenName: cls.asToken.name,
+          tokenFilePath: resolvedPath,
+          className: cls.className,
+          classFilePath: cls.filePath,
+        })
+        continue
+      }
+    }
+    console.warn(`⚠️  Cannot resolve import for 'as: ${cls.asToken.name}' in ${cls.filePath}`)
+    standaloneClasses.push(cls)
+  } else if (cls.implementsInterface && ifaceToToken.has(cls.implementsInterface)) {
     const token = ifaceToToken.get(cls.implementsInterface)
     tokenBindings.push({
       tokenName: token.tokenName,

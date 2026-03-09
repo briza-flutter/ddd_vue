@@ -1,12 +1,11 @@
 import { AxiosError } from "axios";
-import { Inject, Injectable } from "injection-js";
+import { Inject, Injectable } from "../../config/di";
 import { LocalAuthStorage } from "../../domain/auth/repositories/localAuthStorage";
-import { TokenStorageToken } from "../../infrastructure/storage/TokenStorage";
 
 @Injectable()
 export class InterceptorHandler {
   constructor(
-    @Inject(TokenStorageToken) private localAuthStorage: LocalAuthStorage,
+    @Inject(LocalAuthStorage) private localAuthStorage: LocalAuthStorage,
   ) {}
 
   getToken(): string | null {

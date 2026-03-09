@@ -1,14 +1,11 @@
-import { Injectable, InjectionToken } from "../../config/di";
+import { Injectable } from "../../config/di";
 import { User } from "../../domain/auth/entities/User";
 import { LocalAuthStorage } from "../../domain/auth/repositories/localAuthStorage";
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
-export const TokenStorageToken = new InjectionToken<LocalAuthStorage>(
-  "TokenStorage",
-);
 
-@Injectable()
+@Injectable({ as: LocalAuthStorage })
 export class TokenStorage implements LocalAuthStorage {
   getToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);

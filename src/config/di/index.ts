@@ -1,4 +1,19 @@
-import { type Injector, type Provider } from "injection-js";
+import {
+  Injectable as _Injectable,
+  InjectionToken,
+  type Injector,
+  type Provider,
+} from "injection-js";
+
+// 扩展 Injectable 装饰器，支持 @Injectable({ as: AbstractClass }) 声明 DI token
+// 生成器会解析 as 参数，自动生成 { provide: as, useClass: Class } 绑定
+type ProvideToken =
+  | (abstract new (...args: any[]) => any)
+  | InjectionToken<any>;
+
+export function Injectable(_options?: { as?: ProvideToken }): ClassDecorator {
+  return _Injectable();
+}
 import { HttpClient } from "../../infrastructure/http/httpClient";
 import { authInterceptor } from "../../infrastructure/http/interceptors/authInterceptor";
 import { responseInterceptor } from "../../infrastructure/http/interceptors/responseInterceptor";
@@ -18,11 +33,11 @@ export const customProviders: Provider[] = [
     provide: HttpClient,
     useFactory: (handler: InterceptorHandler) =>
       new HttpClient({
-        baseURL: "http://192.168.3.129:8080",
+        baseURL: "https://rtznwl.com/ruitang",
         requestInterceptors: [authInterceptor(() => handler.getToken())],
         responseInterceptors: [
           responseInterceptor(),
-          errorInterceptor((error) => handler.onErrorCallback(error)),
+          errorInterceptor(handler.onErrorCallback),
         ],
       }),
     deps: [InterceptorHandler],
