@@ -4,7 +4,6 @@ import { LocalAuthStorage } from "../../domain/auth/repositories/localAuthStorag
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
-
 @Injectable({ as: LocalAuthStorage })
 export class TokenStorage implements LocalAuthStorage {
   getToken(): string | null {

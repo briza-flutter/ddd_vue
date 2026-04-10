@@ -27,7 +27,7 @@
         </div>
         <p v-if="authStore.error" class="error">{{ authStore.error }}</p>
         <button type="submit" :disabled="authStore.loading">
-          {{ authStore.loading ? '登录中...' : '登录' }}
+          {{ authStore.loading ? "登录中..." : "登录" }}
         </button>
       </form>
       <p class="hint">默认账号: admin / admin</p>
@@ -36,22 +36,20 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/authStore'
-
-const authStore = useAuthStore()
-const router = useRouter()
-
+import { reactive } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/authStore";
+const authStore = useAuthStore();
+const router = useRouter();
 const form = reactive({
-  username: '',
-  password: '',
-})
+  username: "",
+  password: "",
+});
 
 async function handleLogin() {
   try {
-    await authStore.login(form.username, form.password)
-    router.push('/')
+    await authStore.login(form.username, form.password);
+    router.push("/");
   } catch {
     // error is handled by store
   }

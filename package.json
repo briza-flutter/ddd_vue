@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "generate:di": "node scripts/generate-di.mjs"
+    "generate:di": "node scripts/generate-di.mjs",
+    "type-check:watch": "vue-tsc --noEmit --watch"
   },
   "dependencies": {
     "axios": "^1.13.6",
